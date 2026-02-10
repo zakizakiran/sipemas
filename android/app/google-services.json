@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "879013247612",
+    "project_id": "reactapp-87430",
+    "storage_bucket": "reactapp-87430.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:879013247612:android:5daa03a00b5f2c8f34e7f9",
+        "android_client_info": {
+          "package_name": "com.sipermas.sipermas"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "879013247612-fshp8g8o6r2ef5anq695p58l2piqip2d.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDlQ5CWwoXEWG8iHlKyHBzRvL0HTADyfyU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "879013247612-fshp8g8o6r2ef5anq695p58l2piqip2d.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

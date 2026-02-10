@@ -1,23 +1,45 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../../routes/app_pages.dart';
 
 class HomeController extends GetxController {
-  //TODO: Implement HomeController
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  final count = 0.obs;
+  final userName = Rx<String?>('');
+  final userEmail = Rx<String?>('');
+
   @override
   void onInit() {
     super.onInit();
+    loadUserData();
   }
 
-  @override
-  void onReady() {
-    super.onReady();
+  void loadUserData() {
+    final user = _auth.currentUser;
+    userName.value = user?.displayName ?? 'User';
+    userEmail.value = user?.email ?? '';
   }
 
-  @override
-  void onClose() {
-    super.onClose();
+  Future<void> logout() async {
+    try {
+      await _auth.signOut();
+      Get.snackbar(
+        'Sukses',
+        'Logout berhasil',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+      Get.offAllNamed(Routes.LOGIN);
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Gagal logout: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
   }
-
-  void increment() => count.value++;
 }
