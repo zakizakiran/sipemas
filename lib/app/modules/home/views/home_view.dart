@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:sipermas/app/modules/home/controllers/emergency_controller_controller.dart';
+import 'package:sipermas/app/modules/home/controllers/emergency_controller.dart';
 import 'package:sipermas/app/modules/home/views/tabs_view.dart';
 import '../controllers/home_controller.dart';
 
@@ -26,7 +26,13 @@ class HomeView extends GetView<HomeController> {
         backgroundColor: Colors.grey[50], // Background lebih clean
         body: IndexedStack(
           index: controller.tabIndex.value,
-          children: [_buildHomeTab(), PetaTab(), RiwayatTab(), ProfilTab()],
+          children: [
+            _buildHomeTab(),
+            PetaTab(),
+            RiwayatTab(),
+            LeaderboardTab(),
+            ProfilTab(),
+          ],
         ),
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: controller.tabIndex.value,
@@ -46,6 +52,10 @@ class HomeView extends GetView<HomeController> {
             BottomNavigationBarItem(
               icon: Icon(Icons.history_rounded),
               label: 'Riwayat',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.leaderboard_rounded),
+              label: 'Peringkat',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_rounded),

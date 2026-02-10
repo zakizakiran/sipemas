@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:sipermas/app/modules/home/controllers/map_controller_controller.dart';
 import 'package:sipermas/app/modules/home/controllers/history_controller_controller.dart';
 import 'package:sipermas/app/modules/home/controllers/profile_controller.dart';
+import 'package:sipermas/app/modules/home/controllers/leaderboard_controller.dart';
 import '../../../data/models/laporan_darurat.dart';
 
 class PetaTab extends StatelessWidget {
@@ -509,6 +510,145 @@ class RiwayatTab extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// Tab: Leaderboard
+class LeaderboardTab extends StatelessWidget {
+  final LeaderboardController controller = Get.put(LeaderboardController());
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        title: const Text(
+          "Papan Peringkat",
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+      ),
+      body: Obx(() {
+        if (controller.isLoading.value) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (controller.topUsers.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.leaderboard_rounded,
+                  size: 80,
+                  color: Colors.grey[300],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "Belum ada data peringkat",
+                  style: TextStyle(color: Colors.grey[500], fontSize: 16),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.only(top: 10, bottom: 20),
+          itemCount: controller.topUsers.length,
+          itemBuilder: (context, index) {
+            final user = controller.topUsers[index];
+            final rank = index + 1;
+            final String nama = user['nama'] ?? 'Tanpa Nama';
+            final int points = user['total_poin'] ?? 0;
+
+            Color rankColor;
+            if (rank == 1)
+              rankColor = const Color(0xFFFFD700); // Gold
+            else if (rank == 2)
+              rankColor = const Color(0xFFC0C0C0); // Silver
+            else if (rank == 3)
+              rankColor = const Color(0xFFCD7F32); // Bronze
+            else
+              rankColor = Colors.grey[300]!;
+
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 5,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                leading: CircleAvatar(
+                  backgroundColor: rankColor,
+                  radius: 20,
+                  child: Text(
+                    "$rank",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                title: Text(
+                  nama,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                subtitle: Text(
+                  rank == 1 ? "Pahlawan Utama" : "Pahlawan Siaga",
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+                trailing: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.stars_rounded,
+                        color: Colors.orange,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        "$points",
+                        style: const TextStyle(
+                          color: Colors.orange,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      }),
     );
   }
 }
