@@ -1,110 +1,114 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:sipermas/app/modules/home/controllers/emergency_controller_controller.dart';
 import '../controllers/home_controller.dart';
 
 class HomeView extends GetView<HomeController> {
-  const HomeView({super.key});
+  // Inject EmergencyController (Bisa juga via Binding)
+  final EmergencyController emergencyC = Get.put(EmergencyController());
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('SIPERMAS'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              Get.dialog(
-                AlertDialog(
-                  title: const Text('Logout'),
-                  content: const Text('Apakah Anda yakin ingin keluar?'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Get.back(),
-                      child: const Text('Batal'),
+      appBar: AppBar(title: Text('SIPERMAS - Home'), centerTitle: true),
+      body: Center(
+        child: Obx(() {
+          // Visualisasi Timer / Countdown Overlay
+          if (emergencyC.isCountingDown.value) {
+            return _buildCountdownOverlay();
+          }
+
+          // Tampilan Normal (Tombol SOS Besar)
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                emergencyC.statusTampilan.value,
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 50),
+
+              // Tombol Darurat (Panic Button)
+              GestureDetector(
+                onTap: () {
+                  // Trigger Sequence 1: tekanTombolDarurat -> prosesVerifikasi
+                  emergencyC.prosesVerifikasiDarurat();
+                },
+                child: Container(
+                  width: 200,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.red.withOpacity(0.5),
+                        blurRadius: 20,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      "SOS",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 40,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    TextButton(
-                      onPressed: () {
-                        Get.back();
-                        controller.logout();
-                      },
-                      child: const Text('Logout'),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 30,
-                          backgroundColor: Theme.of(context).primaryColor,
-                          child: const Icon(
-                            Icons.person,
-                            size: 35,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Obx(
-                                () => Text(
-                                  controller.userName.value ?? 'User',
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Obx(
-                                () => Text(
-                                  controller.userEmail.value ?? '',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
               ),
+              SizedBox(height: 20),
+              Text(
+                "Tekan tombol untuk bantuan darurat",
+                style: TextStyle(color: Colors.grey),
+              ),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildCountdownOverlay() {
+    return Container(
+      color: Colors.black87,
+      width: double.infinity,
+      height: double.infinity,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            "Mengirim Sinyal Dalam...",
+            style: TextStyle(color: Colors.white, fontSize: 20),
+          ),
+          SizedBox(height: 20),
+          Text(
+            "${emergencyC.countdownValue.value}",
+            style: TextStyle(
+              color: Colors.red,
+              fontSize: 80,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'Selamat Datang',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 50),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Di Sistem Pelaporan Masyarakat',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
+            onPressed: () {
+              // Trigger Sequence 6: tekanTombolBatal
+              emergencyC.tekanTombolBatal();
+            },
+            child: Text(
+              "BATALKAN",
+              style: TextStyle(color: Colors.red, fontSize: 18),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
