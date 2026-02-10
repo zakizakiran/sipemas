@@ -23,22 +23,26 @@ class MapsController extends GetxController {
   // Lokasi User Saat Ini
   var currentLocation = Rx<LatLng?>(null);
 
+  // --- TAMBAHAN 1: VARIABEL FILTER ---
+  var filterKategori =
+      "SEMUA".obs; // Pilihan: SEMUA, SOS, KEBAKARAN, KRIMINAL, MEDIS
+  var filterJarakKm = 10.0.obs; // Default radius 10 KM
+
+  // Simpan semua data mentah dari Firebase sebelum difilter
+  List<LaporanDarurat> _allLaporanCached = [];
+
   // Lokasi awal (Default UNIKOM jika GPS belum dapat)
   final LatLng initialPosition = LatLng(-6.886864, 107.615254);
 
   @override
   void onInit() {
     super.onInit();
-    // 1. Cari lokasi saya
     _getCurrentLocation();
-    // 2. Dengar update laporan
     listenToLaporanAktif();
   }
 
-  // Fungsi mendapatkan lokasi user realtime
   Future<void> _getCurrentLocation() async {
     try {
-      // Cek permission (Basic check, idealnya handle denied)
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -50,15 +54,15 @@ class MapsController extends GetxController {
         LatLng myPos = LatLng(position.latitude, position.longitude);
         currentLocation.value = myPos;
 
-        // Pindahkan kamera ke lokasi saya
         mapController.move(myPos, 15.0);
+
+        terapkanFilter();
       }
     } catch (e) {
       print("Gagal ambil lokasi: $e");
     }
   }
 
-  // Fungsi untuk tombol "My Location"
   void centerOnMe() {
     if (currentLocation.value != null) {
       mapController.move(currentLocation.value!, 16.0);
@@ -73,56 +77,127 @@ class MapsController extends GetxController {
         .where('status_laporan', isEqualTo: 'AKTIF')
         .snapshots()
         .listen((snapshot) {
-          markers.clear();
-          List<Marker> newMarkers = [];
+          _allLaporanCached = snapshot.docs.map((doc) {
+            return LaporanDarurat.fromJson(doc.data());
+          }).toList();
 
-          for (var doc in snapshot.docs) {
-            LaporanDarurat laporan = LaporanDarurat.fromJson(doc.data());
+          terapkanFilter();
+        });
+  }
 
-            List<String> latlong = laporan.lokasiGPS.split(',');
-            double lat = double.parse(latlong[0].trim());
-            double lng = double.parse(latlong[1].trim());
+  void terapkanFilter() {
+    List<Marker> newMarkers = [];
+    LatLng? myPos = currentLocation.value;
 
-            // Menambahkan Marker
-            newMarkers.add(
-              Marker(
-                point: LatLng(lat, lng),
-                width: 80,
-                height: 80,
-                child: GestureDetector(
-                  onTap: () {
-                    // Tampilkan Modal/Dialog saat marker diklik
-                    tampilkanInfoMarker(laporan, lat, lng);
-                  },
-                  child: Column(
-                    children: [
-                      Icon(Icons.location_on, color: Colors.red, size: 40),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(4),
-                          boxShadow: [BoxShadow(blurRadius: 2)],
-                        ),
-                        child: Text(
-                          laporan.tipeKejadian,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
+    for (var laporan in _allLaporanCached) {
+      // Parse Lokasi Laporan
+      List<String> latlong = laporan.lokasiGPS.split(',');
+      double lat = double.parse(latlong[0].trim());
+      double lng = double.parse(latlong[1].trim());
+
+      // FILTER 1: Kategori
+      if (filterKategori.value != "SEMUA" &&
+          laporan.tipeKejadian != filterKategori.value) {
+        continue; // Skip jika kategori tidak cocok
+      }
+
+      // FILTER 2: Jarak (Jika lokasi saya tersedia)
+      if (myPos != null) {
+        double distMeters = Geolocator.distanceBetween(
+          myPos.latitude,
+          myPos.longitude,
+          lat,
+          lng,
+        );
+        double distKm = distMeters / 1000;
+
+        if (distKm > filterJarakKm.value) {
+          continue; // Skip jika di luar radius filter
+        }
+      }
+
+      // Jika lolos filter, buat Marker
+      newMarkers.add(
+        Marker(
+          point: LatLng(lat, lng),
+          width: 80,
+          height: 80,
+          child: GestureDetector(
+            onTap: () {
+              // Tampilkan Modal/Dialog saat marker diklik
+              tampilkanInfoMarker(laporan, lat, lng);
+            },
+            child: Column(
+              children: [
+                Icon(
+                  Icons.location_on,
+                  color: _getColorByTipe(laporan.tipeKejadian),
+                  size: 40,
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                    boxShadow: [BoxShadow(blurRadius: 2)],
+                  ),
+                  child: Text(
+                    laporan.tipeKejadian,
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
                   ),
                 ),
-              ),
-            );
-          }
-          markers.value = newMarkers;
-        });
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    markers.value = newMarkers;
+  }
+
+  // Helper warna marker
+  Color _getColorByTipe(String tipe) {
+    switch (tipe) {
+      case 'KEBAKARAN':
+        return Colors.orange;
+      case 'MEDIS':
+        return Colors.green;
+      case 'KRIMINAL':
+        return Colors.blueGrey;
+      default:
+        return Colors.red;
+    }
+  }
+
+  // --- FUNGSI BARU: LAPOR HOAKS (Sesuai Dokumen Hal 19) ---
+  void laporHoaks(String idLaporan) {
+    Get.defaultDialog(
+      title: "Lapor Hoaks?",
+      middleText: "Apakah Anda yakin laporan ini palsu/tidak benar?",
+      textConfirm: "Ya, Lapor",
+      textCancel: "Batal",
+      confirmTextColor: Colors.white, // Text color for default button
+      buttonColor: Colors.red, // Button color for default button
+      onConfirm: () async {
+        Get.back(); // Tutup dialog konfirmasi
+        Get.back(); // Tutup dialog marker
+
+        try {
+          // Tambahkan flag/counter report pada dokumen laporan
+          await _firestore.collection('laporan_darurat').doc(idLaporan).update({
+            'jumlah_laporan_palsu': FieldValue.increment(1),
+            // Opsional: Jika laporan palsu > 5, otomatis set status DIBATALKAN
+          });
+
+          Get.snackbar(
+            "Laporan Diterima",
+            "Terima kasih telah menjaga komunitas aman.",
+          );
+        } catch (e) {
+          Get.snackbar("Error", "Gagal melapor: $e");
+        }
+      },
+    );
   }
 
   void tampilkanInfoMarker(LaporanDarurat laporan, double lat, double lng) {
@@ -233,6 +308,23 @@ class MapsController extends GetxController {
               ),
               const SizedBox(height: 10),
 
+              // --- TAMBAHAN: TOMBOL FLAG/HOAKS ---
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.redAccent,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: () {
+                    // Panggil fungsi lapor hoaks
+                    laporHoaks(laporan.idLaporan);
+                  },
+                  icon: const Icon(Icons.flag_rounded),
+                  label: const Text("LAPORKAN PALSU (HOAKS)"),
+                ),
+              ),
+
               // Action 3: Tutup
               TextButton(
                 onPressed: () => Get.back(),
@@ -245,7 +337,6 @@ class MapsController extends GetxController {
     );
   }
 
-  // Tetap gunakan Google Maps Eksternal untuk Routing (Gratis & Lebih Akurat)
   Future<void> bukaGoogleMapsNavigasi(double lat, double lng) async {
     final Uri googleMapsUrl = Uri.parse("google.navigation:q=$lat,$lng&mode=d");
     if (!await launchUrl(googleMapsUrl)) {

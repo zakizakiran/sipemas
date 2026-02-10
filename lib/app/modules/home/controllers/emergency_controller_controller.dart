@@ -16,12 +16,16 @@ class EmergencyController extends GetxController {
   var isCountingDown = false.obs;
   var countdownValue = 3.obs;
   var statusTampilan = "Siaga".obs; // Default status
+  var selectedTipeKejadian = "SOS".obs; // Tambahkan variabel tipe kejadian
   Timer? _timer;
 
   // --- IMPLEMENTASI SEQUENCE ANTI FALSE ALARM (Hal. 34) ---
 
   // Pesan 2: prosesVerifikasiDarurat
-  void prosesVerifikasiDarurat() {
+  void prosesVerifikasiDarurat({String tipe = "SOS"}) {
+    // Simpan tipe yang dipilih
+    selectedTipeKejadian.value = tipe;
+
     // Pesan 3: cekModeAlarm (Asumsi default TRUE/ALARM KERAS)
     bool isHardAlarm = true;
 
@@ -37,7 +41,7 @@ class EmergencyController extends GetxController {
   void startCountdown() {
     isCountingDown.value = true;
     countdownValue.value = 3;
-    statusTampilan.value = "Menunggu Verifikasi...";
+    statusTampilan.value = "Siap kirim ${selectedTipeKejadian.value} ...";
 
     // Pesan 5: visualisasiTimer (dilakukan via Reactive Variable countdownValue di UI)
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
@@ -144,7 +148,7 @@ class EmergencyController extends GetxController {
       }
     }
 
-    statusTampilan.value = "Mengirim Bantuan...";
+    statusTampilan.value = "Mengirim Laporan ${selectedTipeKejadian.value}...";
 
     try {
       Position position = await _determinePosition();
@@ -156,7 +160,7 @@ class EmergencyController extends GetxController {
       LaporanDarurat laporan = LaporanDarurat(
         idLaporan: DateTime.now().millisecondsSinceEpoch.toString(),
         pembuatId: myUserId, // <-- SET ID PEMBUAT DI SINI
-        tipeKejadian: "SOS",
+        tipeKejadian: selectedTipeKejadian.value, // Gunakan tipe yang dipilih
         statusLaporan: "AKTIF",
         waktu: DateTime.now(),
         lokasiGPS: lokasi,

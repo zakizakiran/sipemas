@@ -69,11 +69,13 @@ class HomeView extends GetView<HomeController> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     _buildStatusCard(),
-                    const SizedBox(height: 50),
+                    const SizedBox(height: 30),
                     _buildSOSButton(),
                     const SizedBox(height: 30),
+                    _buildQuickTags(),
+                    const SizedBox(height: 20),
                     Text(
-                      "Tekan tombol 3 detik untuk bantuan darurat",
+                      "Tekan tombol SOS atau pilih kategori darurat",
                       style: TextStyle(color: Colors.grey[600]),
                     ),
                   ],
@@ -209,7 +211,7 @@ class HomeView extends GetView<HomeController> {
   Widget _buildSOSButton() {
     return GestureDetector(
       onTap: () {
-        emergencyC.prosesVerifikasiDarurat();
+        emergencyC.prosesVerifikasiDarurat(tipe: "SOS");
       },
       child: Container(
         width: 220,
@@ -251,6 +253,66 @@ class HomeView extends GetView<HomeController> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildQuickTags() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _buildCategoryButton(
+          icon: Icons.local_fire_department_rounded,
+          label: "KEBAKARAN",
+          color: Colors.orange,
+          onTap: () => emergencyC.prosesVerifikasiDarurat(tipe: "KEBAKARAN"),
+        ),
+        _buildCategoryButton(
+          icon: Icons.local_police_rounded,
+          label: "KRIMINAL",
+          color: Colors.blueGrey,
+          onTap: () => emergencyC.prosesVerifikasiDarurat(tipe: "KRIMINAL"),
+        ),
+        _buildCategoryButton(
+          icon: Icons.medical_services_rounded,
+          label: "MEDIS",
+          color: Colors.green,
+          onTap: () => emergencyC.prosesVerifikasiDarurat(tipe: "MEDIS"),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategoryButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(50),
+          child: Container(
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+              border: Border.all(color: color, width: 2),
+            ),
+            child: Icon(icon, color: color, size: 30),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ],
     );
   }
 

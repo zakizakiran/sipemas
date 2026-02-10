@@ -15,6 +15,7 @@ class PetaTab extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
+          // 1. PETA (Layer Bawah)
           Obx(
             () => FlutterMap(
               mapController: controller.mapController,
@@ -23,17 +24,16 @@ class PetaTab extends StatelessWidget {
                 initialZoom: 15.0,
               ),
               children: [
-                // 1. Layer Tile (Gambar Peta dari OpenStreetMap)
+                // Layer Tile
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName:
-                      'com.sipermas.app', // Ganti dengan package name Anda
+                  userAgentPackageName: 'com.sipermas.app',
                 ),
 
-                // 2. Layer Marker (Pin Kejadian)
+                // Layer Marker
                 MarkerLayer(markers: controller.markers.value),
 
-                // 3. Layer Lokasi Saya (Blue Dot)
+                // Layer Lokasi Saya (Blue Dot)
                 if (controller.currentLocation.value != null)
                   MarkerLayer(
                     markers: [
@@ -66,16 +66,135 @@ class PetaTab extends StatelessWidget {
                     ],
                   ),
 
-                // 4. (Opsional) Layer Attribution - Wajib untuk OSM Free
                 RichAttributionWidget(
                   attributions: [
                     TextSourceAttribution(
                       'OpenStreetMap contributors',
-                      onTap: () {}, // Kosongkan atau buka link OSM
+                      onTap: () {},
                     ),
                   ],
                 ),
               ],
+            ),
+          ),
+
+          // 2. FILTER BAR (Layer Atas) - Digunakan untuk memfilter kategori dan jarak
+          Positioned(
+            top: 50, // Di bawah status bar
+            left: 20,
+            right: 20,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  // Filter Kategori (Dropdown)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Obx(
+                      () => DropdownButton<String>(
+                        value: controller.filterKategori.value,
+                        underline: const SizedBox(),
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                        style: const TextStyle(
+                          color: Colors.black87,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                        items:
+                            [
+                              "SEMUA",
+                              "SOS",
+                              "KEBAKARAN",
+                              "KRIMINAL",
+                              "MEDIS",
+                            ].map((String val) {
+                              return DropdownMenuItem(
+                                value: val,
+                                child: Text(val),
+                              );
+                            }).toList(),
+                        onChanged: (newVal) {
+                          if (newVal != null) {
+                            controller.filterKategori.value = newVal;
+                            controller.terapkanFilter(); // Refresh marker
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 10),
+
+                  // Filter Jarak (Dropdown)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.radar_rounded,
+                          size: 16,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 8),
+                        Obx(
+                          () => DropdownButton<double>(
+                            value: controller.filterJarakKm.value,
+                            underline: const SizedBox(),
+                            icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                            items: [1.0, 5.0, 10.0, 25.0, 50.0].map((
+                              double val,
+                            ) {
+                              return DropdownMenuItem(
+                                value: val,
+                                child: Text("${val.toInt()} KM"),
+                              );
+                            }).toList(),
+                            onChanged: (newVal) {
+                              if (newVal != null) {
+                                controller.filterJarakKm.value = newVal;
+                                controller.terapkanFilter(); // Refresh marker
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 
@@ -90,62 +209,7 @@ class PetaTab extends StatelessWidget {
             ),
           ),
 
-          // Panel Info
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(25),
-                  bottomRight: Radius.circular(25),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.blueAccent.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.map_rounded,
-                      color: Colors.blueAccent,
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Peta Kejadian",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      Text(
-                        "Pantau area sekitar anda",
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
+          // HAPUS Panel Info Lama karena tertutup filter
         ],
       ),
     );
@@ -279,6 +343,28 @@ class RiwayatTab extends StatelessWidget {
         break;
     }
 
+    // Tentukan Icon & Warna Berdasar Tipe Kejadian
+    IconData categoryIcon;
+    Color categoryColor;
+
+    switch (laporan.tipeKejadian) {
+      case 'KEBAKARAN':
+        categoryIcon = Icons.local_fire_department_rounded;
+        categoryColor = Colors.orange;
+        break;
+      case 'KRIMINAL':
+        categoryIcon = Icons.local_police_rounded;
+        categoryColor = Colors.blueGrey;
+        break;
+      case 'MEDIS':
+        categoryIcon = Icons.medical_services_rounded;
+        categoryColor = Colors.green;
+        break;
+      default:
+        categoryIcon = Icons.warning_amber_rounded;
+        categoryColor = Colors.redAccent;
+    }
+
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 16),
@@ -328,10 +414,17 @@ class RiwayatTab extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const Icon(
-                        Icons.sos_outlined,
-                        color: Colors.black87,
-                        size: 28,
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: categoryColor.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          categoryIcon,
+                          color: categoryColor,
+                          size: 24,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Column(
