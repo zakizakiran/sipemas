@@ -1,7 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
+import 'package:vibration/vibration.dart';
 import '../../../data/models/laporan_darurat.dart';
 
 class EmergencyController extends GetxController {
@@ -51,6 +55,8 @@ class EmergencyController extends GetxController {
     if (_timer != null) {
       _timer!.cancel();
     }
+    FlutterRingtonePlayer().stop();
+    Vibration.cancel();
     // Pesan 7: batalkanProses
     batalkanProses();
   }
@@ -69,68 +75,134 @@ class EmergencyController extends GetxController {
 
   // --- IMPLEMENTASI SEQUENCE KIRIM DARURAT (Hal. 28) ---
 
-  // Pesan 3: prosesKirimDarurat
+  // Instance Firestore
+  FirebaseFirestore firestore = FirebaseFirestore.instance;
+
+  @override
+  void onInit() {
+    super.onInit();
+    // Jalankan Listener saat aplikasi dibuka agar bisa menerima broadcast orang lain
+    listenToBroadcasts();
+  }
+
+  @override
+  void onClose() {
+    FlutterRingtonePlayer().stop();
+    Vibration.cancel();
+    _timer?.cancel();
+    super.onClose();
+  }
+
+  // --- FUNGSI 1: BROADCAST KE USER LAIN (PENGIRIM) ---
   void prosesKirimDarurat(String mode) async {
-    // Pesan 19: tampilkanStatus("Mengirim Bantuan")
+    // Beri feedback GETARAN SAJA untuk pengirim
+    if (mode == "ALARM") {
+      bool? hasVibrator = await Vibration.hasVibrator();
+      if (hasVibrator ?? false) {
+        // Getar pola (tunggu 500ms, getar 1000ms, tunggu 500ms, getar 1000ms)
+        Vibration.vibrate(pattern: [500, 1000, 500, 1000], repeat: 0);
+
+        // Hentikan getaran otomatis setelah 10 detik
+        Future.delayed(Duration(seconds: 10), () {
+          Vibration.cancel();
+        });
+      }
+    }
+
     statusTampilan.value = "Mengirim Bantuan...";
 
     try {
-      // Pesan 4: ambilLokasiRealTime
       Position position = await _determinePosition();
       String lokasi = "${position.latitude}, ${position.longitude}";
 
-      // Pesan 5: <<create>> LaporanDarurat
+      // Ambil User ID dari Firebase Auth
+      String myUserId = FirebaseAuth.instance.currentUser?.uid ?? "anonim";
+
       LaporanDarurat laporan = LaporanDarurat(
-        idLaporan: DateTime.now().millisecondsSinceEpoch.toString(), // Pesan 11
+        idLaporan: DateTime.now().millisecondsSinceEpoch.toString(),
+        pembuatId: myUserId, // <-- SET ID PEMBUAT DI SINI
         tipeKejadian: "SOS",
-        statusLaporan: "AKTIF", // Pesan 9
-        waktu: DateTime.now(), // Pesan 8
-        lokasiGPS: lokasi, // Pesan 7
-        modeAlarm: mode, // Pesan 6
+        statusLaporan: "AKTIF",
+        waktu: DateTime.now(),
+        lokasiGPS: lokasi,
+        modeAlarm: mode,
       );
 
-      // Simulasi kirim ke API/Backend
-      await Future.delayed(Duration(seconds: 2));
+      // Simpan ke Firestore
+      await firestore
+          .collection('laporan_darurat')
+          .doc(laporan.idLaporan)
+          .set(laporan.toJson());
 
-      // Pesan 12: broadcastNotifikasi
-      broadcastNotifikasi();
-
-      // Pesan 13: suksesTerkirim
-      Get.snackbar(
-        "DARURAT",
-        "Sinyal SOS Terkirim! Lokasi: $lokasi",
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        duration: Duration(seconds: 5),
-      );
+      // Jangan tampilkan dialog peringatan untuk diri sendiri
+      // Cukup tampilkan status di UI
       statusTampilan.value = "Bantuan Sedang Dikirim";
+      Get.snackbar("DARURAT", "Sinyal SOS Terkirim! Menunggu bantuan...");
     } catch (e) {
-      // Error handling GPS
-      String errorMsg = "Gagal mendapatkan lokasi";
-      if (e.toString().contains('disabled')) {
-        errorMsg = "GPS tidak aktif. Silakan aktifkan GPS";
-      } else if (e.toString().contains('denied')) {
-        errorMsg = "Izin lokasi ditolak. Silakan berikan izin";
-      }
-
-      Get.snackbar(
-        "Error",
-        errorMsg,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-        duration: Duration(seconds: 4),
-      );
+      Get.snackbar("Error", "Gagal broadcast: $e");
       statusTampilan.value = "Gagal Kirim";
-
-      // Reset status setelah 2 detik
-      Future.delayed(Duration(seconds: 2), () {
-        statusTampilan.value = "Siaga";
-      });
     }
   }
 
-  void broadcastNotifikasi() {
-    print("Broadcasting notification to nearby users...");
+  // --- FUNGSI 2: TERIMA BROADCAST DARI USER LAIN (PENERIMA) ---
+  void listenToBroadcasts() {
+    String myUserId = FirebaseAuth.instance.currentUser?.uid ?? "";
+
+    firestore
+        .collection('laporan_darurat')
+        .where('status_laporan', isEqualTo: 'AKTIF')
+        .snapshots()
+        .listen((snapshot) {
+          for (var change in snapshot.docChanges) {
+            // Hanya proses jika ada data BARU ditambahkan
+            if (change.type == DocumentChangeType.added) {
+              var data = change.doc.data() as Map<String, dynamic>;
+              LaporanDarurat laporanBaru = LaporanDarurat.fromJson(data);
+
+              // --- LOGIKA FILTER DISINI ---
+              // Jika pembuat laporan adalah SAYA SENDIRI, abaikan/skip
+              if (laporanBaru.pembuatId == myUserId) {
+                print("Laporan sendiri terdeteksi, abaikan notifikasi.");
+                continue;
+              }
+
+              // Jika bukan saya, tampilkan peringatan
+              tampilkanNotifikasiLayar(laporanBaru);
+            }
+          }
+        });
+  }
+
+  void tampilkanNotifikasiLayar(LaporanDarurat laporan) {
+    // Mainkan alarm ketika menerima notifikasi darurat
+    FlutterRingtonePlayer().playAlarm(
+      looping: true,
+      asAlarm: true,
+      volume: 1.0,
+    );
+
+    Get.defaultDialog(
+      title: "⚠️ PERINGATAN DARURAT ⚠️",
+      titleStyle: TextStyle(
+        color: Get.theme.colorScheme.error,
+        fontWeight: FontWeight.bold,
+      ),
+      middleText:
+          "Seseorang membutuhkan bantuan!\nLokasi: ${laporan.lokasiGPS}\nWaktu: ${laporan.waktu}",
+      textConfirm: "LIHAT PETA",
+      textCancel: "ABAIKAN",
+      confirmTextColor: Get.theme.colorScheme.onPrimary,
+      barrierDismissible: false,
+      onConfirm: () {
+        FlutterRingtonePlayer().stop();
+        Get.back();
+        // Arahkan ke Google Maps atau Menu Peta (Fitur Lihat Peta Kejadian)
+        // Get.toNamed('/peta', arguments: laporan);
+      },
+      onCancel: () {
+        FlutterRingtonePlayer().stop();
+      },
+    );
   }
 
   // Fungsi Helper untuk GPS (Sesuai dokumentasi Geolocator)

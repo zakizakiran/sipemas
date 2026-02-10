@@ -39,6 +39,9 @@ dependencies:
   firebase_auth: ^6.1.4
   get_storage: ^2.1.1
   geolocator: ^10.1.0
+  cloud_firestore: ^6.1.2
+  flutter_ringtone_player: ^4.0.0+4
+  vibration: ^3.1.6
 
 dev_dependencies:
   flutter_test:
