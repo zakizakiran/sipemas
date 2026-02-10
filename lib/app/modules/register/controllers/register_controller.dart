@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../routes/app_pages.dart';
 
 class RegisterController extends GetxController {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   final nameController = TextEditingController();
   final emailController = TextEditingController();
@@ -81,6 +83,18 @@ class RegisterController extends GetxController {
 
       // Update display name
       await userCredential.user?.updateDisplayName(nameController.text);
+
+      // Simpan data user ke Firestore untuk fitur Poin & Profil
+      if (userCredential.user != null) {
+        await _firestore.collection('users').doc(userCredential.user!.uid).set({
+          'uid': userCredential.user!.uid,
+          'nama': nameController.text.trim(),
+          'email': emailController.text.trim(),
+          'total_poin': 0, // Inisialisasi poin 0
+          'created_at': FieldValue.serverTimestamp(),
+          'role': 'USER',
+        });
+      }
 
       Get.snackbar(
         'Sukses',

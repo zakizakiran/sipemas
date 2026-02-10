@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sipermas/app/modules/home/controllers/emergency_controller_controller.dart';
+import 'package:sipermas/app/modules/home/views/tabs_view.dart';
 import '../controllers/home_controller.dart';
 
 class HomeView extends GetView<HomeController> {
@@ -11,41 +12,77 @@ class HomeView extends GetView<HomeController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: Obx(() {
-        // Visualisasi Timer / Countdown Overlay
-        if (emergencyC.isCountingDown.value) {
-          return _buildCountdownOverlay();
-        }
+    return Obx(() {
+      // 1. Cek Mode Countdown (Prioritas Tertinggi)
+      if (emergencyC.isCountingDown.value) {
+        return Scaffold(
+          backgroundColor: Colors.black,
+          body: _buildCountdownOverlay(),
+        );
+      }
 
-        return SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: Center(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildStatusCard(),
-                        const SizedBox(height: 50),
-                        _buildSOSButton(),
-                        const SizedBox(height: 30),
-                        Text(
-                          "Tekan tombol 3 detik untuk bantuan darurat",
-                          style: TextStyle(color: Colors.grey[600]),
-                        ),
-                      ],
+      // 2. Tampilan Normal dengan Bottom Navigation
+      return Scaffold(
+        backgroundColor: Colors.grey[50], // Background lebih clean
+        body: IndexedStack(
+          index: controller.tabIndex.value,
+          children: [_buildHomeTab(), PetaTab(), RiwayatTab(), ProfilTab()],
+        ),
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: controller.tabIndex.value,
+          onTap: controller.changeTabIndex,
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: Colors.redAccent,
+          unselectedItemColor: Colors.grey,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_rounded),
+              label: 'Beranda',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.map_rounded),
+              label: 'Peta',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.history_rounded),
+              label: 'Riwayat',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_rounded),
+              label: 'Profil',
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildHomeTab() {
+    return SafeArea(
+      child: Column(
+        children: [
+          _buildHeader(),
+          Expanded(
+            child: Center(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildStatusCard(),
+                    const SizedBox(height: 50),
+                    _buildSOSButton(),
+                    const SizedBox(height: 30),
+                    Text(
+                      "Tekan tombol 3 detik untuk bantuan darurat",
+                      style: TextStyle(color: Colors.grey[600]),
                     ),
-                  ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-        );
-      }),
+        ],
+      ),
     );
   }
 
@@ -69,21 +106,24 @@ class HomeView extends GetView<HomeController> {
       child: Row(
         children: [
           // Avatar Profile
-          Obx(() => CircleAvatar(
-                radius: 28,
-                backgroundColor: Colors.blueAccent.shade100,
-                child: controller.userName.value == null ||
-                        controller.userName.value!.isEmpty
-                    ? const Icon(Icons.person, color: Colors.white, size: 30)
-                    : Text(
-                        (controller.userName.value?[0] ?? "U").toUpperCase(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
+          Obx(
+            () => CircleAvatar(
+              radius: 28,
+              backgroundColor: Colors.blueAccent.shade100,
+              child:
+                  controller.userName.value == null ||
+                      controller.userName.value!.isEmpty
+                  ? const Icon(Icons.person, color: Colors.white, size: 30)
+                  : Text(
+                      (controller.userName.value?[0] ?? "U").toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
                       ),
-              )),
+                    ),
+            ),
+          ),
           const SizedBox(width: 15),
           Expanded(
             child: Column(
@@ -94,15 +134,17 @@ class HomeView extends GetView<HomeController> {
                   style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                 ),
                 // Nama User
-                Obx(() => Text(
-                      controller.userName.value ?? "User",
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    )),
+                Obx(
+                  () => Text(
+                    controller.userName.value ?? "User",
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
           ),
@@ -117,7 +159,7 @@ class HomeView extends GetView<HomeController> {
               icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
               tooltip: "Logout",
             ),
-          )
+          ),
         ],
       ),
     );
@@ -146,17 +188,19 @@ class HomeView extends GetView<HomeController> {
             style: TextStyle(color: Colors.grey[600], fontSize: 14),
           ),
           const SizedBox(height: 8),
-          Obx(() => Text(
-                emergencyC.statusTampilan.value,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: emergencyC.statusTampilan.value.contains("Siaga")
-                      ? Colors.green
-                      : Colors.orange,
-                ),
-              )),
+          Obx(
+            () => Text(
+              emergencyC.statusTampilan.value,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: emergencyC.statusTampilan.value.contains("Siaga")
+                    ? Colors.green
+                    : Colors.orange,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -188,10 +232,7 @@ class HomeView extends GetView<HomeController> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Colors.red.shade400,
-              Colors.red.shade700,
-            ],
+            colors: [Colors.red.shade400, Colors.red.shade700],
           ),
         ),
         child: Column(

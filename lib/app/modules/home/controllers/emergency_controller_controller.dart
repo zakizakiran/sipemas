@@ -6,6 +6,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:vibration/vibration.dart';
+import 'package:latlong2/latlong.dart';
+import 'home_controller.dart';
+import 'map_controller_controller.dart';
 import '../../../data/models/laporan_darurat.dart';
 
 class EmergencyController extends GetxController {
@@ -83,6 +86,8 @@ class EmergencyController extends GetxController {
     super.onInit();
     // Jalankan Listener saat aplikasi dibuka agar bisa menerima broadcast orang lain
     listenToBroadcasts();
+    // Pantau status laporan saya sendiri untuk update UI Home
+    monitorMyStatus();
   }
 
   @override
@@ -91,6 +96,36 @@ class EmergencyController extends GetxController {
     Vibration.cancel();
     _timer?.cancel();
     super.onClose();
+  }
+
+  // --- FUNGSI BARU: MONITOR STATUS SAYA ---
+  void monitorMyStatus() {
+    String myUserId = FirebaseAuth.instance.currentUser?.uid ?? "";
+    if (myUserId.isEmpty) return;
+
+    // Listen ke semua laporan saya
+    firestore
+        .collection('laporan_darurat')
+        .where('pembuat_id', isEqualTo: myUserId)
+        .snapshots()
+        .listen((snapshot) {
+          // Cek apakah ada laporan saya yang statusnya masih AKTIF
+          bool hasActiveReport = snapshot.docs.any((doc) {
+            var data = doc.data();
+            return data['status_laporan'] == 'AKTIF';
+          });
+
+          if (hasActiveReport) {
+            statusTampilan.value = "Bantuan Sedang Dikirim";
+          } else {
+            // Jika tidak ada yang aktif, kembalikan ke Siaga
+            // (Tapi cek dulu apakah kita sedang dalam proses hitung mundur/kirim, agar tidak menimpa status loading)
+            if (!isCountingDown.value &&
+                statusTampilan.value != "Mengirim Bantuan...") {
+              statusTampilan.value = "Siaga";
+            }
+          }
+        });
   }
 
   // --- FUNGSI 1: BROADCAST KE USER LAIN (PENGIRIM) ---
@@ -181,27 +216,132 @@ class EmergencyController extends GetxController {
       volume: 1.0,
     );
 
-    Get.defaultDialog(
-      title: "⚠️ PERINGATAN DARURAT ⚠️",
-      titleStyle: TextStyle(
-        color: Get.theme.colorScheme.error,
-        fontWeight: FontWeight.bold,
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon Warning
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.warning_rounded,
+                  color: Colors.redAccent,
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Title
+              const Text(
+                "PERINGATAN DARURAT",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Content
+              Text(
+                "Seseorang membutuhkan bantuan!\nLokasi: ${laporan.lokasiGPS}\nWaktu: ${laporan.waktu}",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 30),
+
+              // Actions
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      onPressed: () {
+                        FlutterRingtonePlayer().stop();
+                        Get.back();
+                      },
+                      child: Text(
+                        "ABAIKAN",
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () {
+                        FlutterRingtonePlayer().stop();
+                        Get.back();
+
+                        try {
+                          // 1. Pindah ke Tab Peta
+                          Get.find<HomeController>().changeTabIndex(1);
+
+                          // 2. Fokuskan Peta ke Lokasi Kejadian
+                          List<String> latlong = laporan.lokasiGPS.split(',');
+                          if (latlong.length == 2) {
+                            double lat = double.parse(latlong[0].trim());
+                            double lng = double.parse(latlong[1].trim());
+
+                            // Pastikan MapsController sudah ada (karena di-put di TabsView)
+                            if (Get.isRegistered<MapsController>()) {
+                              Get.find<MapsController>().mapController.move(
+                                LatLng(lat, lng),
+                                18.0,
+                              );
+                            }
+                          }
+                        } catch (e) {
+                          print("Navigasi Error: $e");
+                        }
+                      },
+                      child: const Text(
+                        "LIHAT PETA",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
-      middleText:
-          "Seseorang membutuhkan bantuan!\nLokasi: ${laporan.lokasiGPS}\nWaktu: ${laporan.waktu}",
-      textConfirm: "LIHAT PETA",
-      textCancel: "ABAIKAN",
-      confirmTextColor: Get.theme.colorScheme.onPrimary,
       barrierDismissible: false,
-      onConfirm: () {
-        FlutterRingtonePlayer().stop();
-        Get.back();
-        // Arahkan ke Google Maps atau Menu Peta (Fitur Lihat Peta Kejadian)
-        // Get.toNamed('/peta', arguments: laporan);
-      },
-      onCancel: () {
-        FlutterRingtonePlayer().stop();
-      },
     );
   }
 

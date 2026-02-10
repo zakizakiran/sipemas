@@ -9,10 +9,16 @@ class HomeController extends GetxController {
   final userName = Rx<String?>('');
   final userEmail = Rx<String?>('');
 
+  var tabIndex = 0.obs;
+
   @override
   void onInit() {
     super.onInit();
     loadUserData();
+  }
+
+  void changeTabIndex(int index) {
+    tabIndex.value = index;
   }
 
   void loadUserData() {
